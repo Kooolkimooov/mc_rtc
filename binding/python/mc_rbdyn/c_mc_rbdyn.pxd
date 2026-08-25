@@ -237,6 +237,14 @@ cdef extern from "<mc_rbdyn/Robot.h>" namespace "mc_rbdyn":
     PTransformd posW()
     void posW(PTransformd pt)
 
+    # The free-flyer velocity/acceleration counterparts of posW: placing a robot
+    # somewhere other than the controller config's init_pos also means giving it
+    # the matching base velocity, otherwise the estimate starts inconsistent.
+    MotionVecd velW()
+    void velW(const MotionVecd & vel)
+    MotionVecd accW()
+    void accW(const MotionVecd & acc)
+
     RobotModule & module()
 
   shared_ptr[Robots] loadRobot(const RobotModule&)

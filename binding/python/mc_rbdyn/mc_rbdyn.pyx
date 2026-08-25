@@ -871,6 +871,20 @@ cdef class Robot(object):
     else:
       self.impl.posW(deref(pt.impl))
 
+  def velW(self, sva.MotionVecd vel = None):
+    self.__is_valid()
+    if vel is None:
+      return sva.MotionVecdFromC(self.impl.velW())
+    else:
+      self.impl.velW(deref(vel.impl))
+
+  def accW(self, sva.MotionVecd acc = None):
+    self.__is_valid()
+    if acc is None:
+      return sva.MotionVecdFromC(self.impl.accW())
+    else:
+      self.impl.accW(deref(acc.impl))
+
   def module(self):
       self.__is_valid()
       return RobotModuleFromCRef(self.impl.module())
