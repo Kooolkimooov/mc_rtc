@@ -161,6 +161,20 @@ cdef class MCController(object):
     return mc_rbdyn.RobotFromC(self.base.env())
   def robots(self):
     return mc_rbdyn.RobotsFromRef(self.base.robots())
+  def realRobots(self):
+    return mc_rbdyn.RobotsFromRef(self.base.realRobots())
+  def realRobot(self, name = None):
+    # The observers' estimate, and what the stabilizer feeds back from. It is
+    # deliberately separate from robot(): MCGlobalController's attitude-taking
+    # init/reset overloads place the *control* robots only, so a simulator that
+    # starts the robot anywhere other than the controller config's init_pos has
+    # to place this one itself or the estimate begins in the wrong frame.
+    if isinstance(name, unicode):
+      name = name.encode(u'ascii')
+    if name is None:
+      return mc_rbdyn.RobotFromC(self.base.realRobot())
+    else:
+      return mc_rbdyn.RobotFromC(self.base.realRobot(name))
   def supported_robots(self):
     supported = []
     self.base.supported_robots(supported)

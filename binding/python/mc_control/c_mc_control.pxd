@@ -69,6 +69,12 @@ cdef extern from "<mc_control/mc_controller.h>" namespace "mc_control":
     Robot& robot()
     Robot& env()
     Robots& robots()
+    # The estimated counterparts of robot()/robots(). The observers write their
+    # state estimate here, and it is what the stabilizer feeds back from -- so a
+    # simulator that places the control robot must place this one too.
+    Robot& realRobot()
+    Robot& realRobot(const string&)
+    Robots& realRobots()
     c_mc_rtc.Configuration & config()
     void supported_robots(vector[string] &)
     c_mc_rtc.Logger & logger()
