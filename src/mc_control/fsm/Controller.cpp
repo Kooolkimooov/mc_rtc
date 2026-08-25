@@ -90,6 +90,12 @@ Controller::~Controller()
 {
   executor_.teardown(*this);
   datastore().clear();
+  // Clear the GUI while the FSM state libraries are still loaded. Otherwise
+  // ~MCController resets the GUI after factory_ (destroyed with this object's
+  // members) has unloaded the state .so's, and destroying GUI std::functions
+  // created by those states jumps into unmapped code (segfault on controller
+  // destruction, e.g. in MCGlobalController::reset()).
+  gui()->reset();
 }
 
 bool Controller::run()
