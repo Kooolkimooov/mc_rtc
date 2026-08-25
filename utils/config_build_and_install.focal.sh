@@ -14,7 +14,7 @@ then
   export APT_DEPENDENCIES="$APT_DEPENDENCIES python-is-python3"
 fi
 
-export MC_LOG_UI_PYTHON_EXECUTABLE=python3
+export PYTHON_EXECUTABLE=python3
 
 mc_rtc_extra_steps()
 {

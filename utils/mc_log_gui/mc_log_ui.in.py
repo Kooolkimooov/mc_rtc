@@ -1,4 +1,4 @@
-#!/usr/bin/env @MC_LOG_UI_PYTHON_EXECUTABLE@
+#!/usr/bin/env @PYTHON_EXECUTABLE@
 # -*- coding: utf-8 -*-
 
 #
