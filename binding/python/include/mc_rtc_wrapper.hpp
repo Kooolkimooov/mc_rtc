@@ -84,3 +84,65 @@ void datastore_set(mc_rtc::DataStore & store, const std::string & name, const T 
   if(create) { store.make<T>(name, value); }
   else { store.assign<T>(name, value); }
 }
+
+template<typename T>
+std::string datastore_callback_signature(const std::string & actual, const std::string & tag)
+{
+  if(actual == mc_rtc::type_name<std::function<T()>>()) { return "get:" + tag + ":value"; }
+  if(actual == mc_rtc::type_name<std::function<const T &()>>()) { return "get:" + tag + ":const_ref"; }
+  if(actual == mc_rtc::type_name<std::function<void(T)>>()) { return "set:" + tag + ":value"; }
+  if(actual == mc_rtc::type_name<std::function<void(const T &)>>()) { return "set:" + tag + ":const_ref"; }
+  return {};
+}
+
+/** Return the Python-supported getter/setter signature for a datastore callback. */
+inline std::string datastore_callback_signature(mc_rtc::DataStore & store, const std::string & name)
+{
+  using Matrix6d = Eigen::Matrix<double, 6, 6>;
+  const auto & actual = store.type(name);
+  if(actual == mc_rtc::type_name<std::function<void()>>()) { return "call:void"; }
+  std::string out;
+#define HANDLE_DATASTORE_CALLBACK(TYPE, TAG)                  \
+  out = datastore_callback_signature<TYPE>(actual, TAG);     \
+  if(!out.empty()) { return out; }
+  HANDLE_DATASTORE_CALLBACK(bool, "bool")
+  HANDLE_DATASTORE_CALLBACK(int, "int")
+  HANDLE_DATASTORE_CALLBACK(unsigned int, "unsigned int")
+  HANDLE_DATASTORE_CALLBACK(size_t, "size_t")
+  HANDLE_DATASTORE_CALLBACK(double, "double")
+  HANDLE_DATASTORE_CALLBACK(std::string, "string")
+  HANDLE_DATASTORE_CALLBACK(std::vector<double>, "vector<double>")
+  HANDLE_DATASTORE_CALLBACK(std::vector<std::string>, "vector<string>")
+  HANDLE_DATASTORE_CALLBACK(Eigen::Vector2d, "Vector2d")
+  HANDLE_DATASTORE_CALLBACK(Eigen::Vector3d, "Vector3d")
+  HANDLE_DATASTORE_CALLBACK(Eigen::Vector6d, "Vector6d")
+  HANDLE_DATASTORE_CALLBACK(Eigen::VectorXd, "VectorXd")
+  HANDLE_DATASTORE_CALLBACK(Eigen::Matrix3d, "Matrix3d")
+  HANDLE_DATASTORE_CALLBACK(Matrix6d, "Matrix6d")
+  HANDLE_DATASTORE_CALLBACK(Eigen::MatrixXd, "MatrixXd")
+  HANDLE_DATASTORE_CALLBACK(Eigen::Quaterniond, "Quaterniond")
+  HANDLE_DATASTORE_CALLBACK(sva::PTransformd, "PTransformd")
+  HANDLE_DATASTORE_CALLBACK(sva::MotionVecd, "MotionVecd")
+  HANDLE_DATASTORE_CALLBACK(sva::ForceVecd, "ForceVecd")
+#undef HANDLE_DATASTORE_CALLBACK
+  return {};
+}
+
+inline void datastore_call_void(mc_rtc::DataStore & store, const std::string & name)
+{
+  store.call<void>(name);
+}
+
+template<typename T>
+T datastore_call_get(mc_rtc::DataStore & store, const std::string & name, bool const_ref)
+{
+  if(const_ref) { return store.call<const T &>(name); }
+  return store.call<T>(name);
+}
+
+template<typename T>
+void datastore_call_set(mc_rtc::DataStore & store, const std::string & name, const T & value, bool const_ref)
+{
+  if(const_ref) { store.call<void, const T &>(name, value); }
+  else { store.call<void, T>(name, value); }
+}

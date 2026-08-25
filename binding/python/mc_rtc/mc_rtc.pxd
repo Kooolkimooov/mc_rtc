@@ -27,6 +27,8 @@ cdef class DataStore(object):
 
   cdef object _tag(self, string key)
   cdef object _get(self, string key, t)
+  cdef object _call_get(self, string key, t, cppbool const_ref)
+  cdef void _call_set(self, string key, t, value, cppbool const_ref) except *
   cdef void _set(self, string key, t, value, cppbool create) except *
 
 cdef DataStore DataStoreFromRef(c_mc_rtc.DataStore &)

@@ -511,6 +511,28 @@ cdef class DataStore(object):
     self.impl.remove(key)
   def clear(self):
     self.impl.clear()
+  def call(self, name, *args):
+    """Invoke a supported zero-argument getter or one-argument setter."""
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      raise KeyError(name)
+    signature = c_mc_rtc.datastore_callback_signature(deref(self.impl), key).decode(u'ascii')
+    if not signature:
+      raise TypeError('Datastore callback "{}" has unsupported signature {}'.format(name, self.type(name)))
+    if signature == u'call:void':
+      if args:
+        raise TypeError('Datastore callback "{}" expects no arguments'.format(name))
+      c_mc_rtc.datastore_call_void(deref(self.impl), key)
+      return None
+    operation, t, qualifier = signature.split(u':')
+    if operation == u'get':
+      if args:
+        raise TypeError('Datastore getter "{}" expects no arguments'.format(name))
+      return self._call_get(key, t, qualifier == u'const_ref')
+    if len(args) != 1:
+      raise TypeError('Datastore setter "{}" expects one argument'.format(name))
+    self._call_set(key, t, args[0], qualifier == u'const_ref')
+    return None
   # Special methods
   def __getitem__(self, name):
     cdef string key = datastore_key(name)
@@ -584,6 +606,95 @@ cdef class DataStore(object):
     elif t == u'ForceVecd':
       return sva.ForceVecdFromC(self.impl.get[c_sva.ForceVecd](key))
     raise TypeError("Cannot read a datastore object of type {}".format(t))
+  cdef object _call_get(self, string key, t, cppbool const_ref):
+    cdef vector[string] vs
+    if t == u'bool':
+      return c_mc_rtc.datastore_call_get[cppbool](deref(self.impl), key, const_ref)
+    elif t == u'int':
+      return c_mc_rtc.datastore_call_get[int](deref(self.impl), key, const_ref)
+    elif t == u'unsigned int':
+      return c_mc_rtc.datastore_call_get[c_mc_rtc.cppuint](deref(self.impl), key, const_ref)
+    elif t == u'size_t':
+      return c_mc_rtc.datastore_call_get[size_t](deref(self.impl), key, const_ref)
+    elif t == u'double':
+      return c_mc_rtc.datastore_call_get[double](deref(self.impl), key, const_ref)
+    elif t == u'string':
+      return c_mc_rtc.datastore_call_get[string](deref(self.impl), key, const_ref).decode(u'ascii')
+    elif t == u'vector<double>':
+      return c_mc_rtc.datastore_call_get[vector[double]](deref(self.impl), key, const_ref)
+    elif t == u'vector<string>':
+      vs = c_mc_rtc.datastore_call_get[vector[string]](deref(self.impl), key, const_ref)
+      return [v.decode(u'ascii') for v in vs]
+    elif t == u'Vector2d':
+      return eigen.Vector2dFromC(c_mc_rtc.datastore_call_get[c_eigen.Vector2d](deref(self.impl), key, const_ref))
+    elif t == u'Vector3d':
+      return eigen.Vector3dFromC(c_mc_rtc.datastore_call_get[c_eigen.Vector3d](deref(self.impl), key, const_ref))
+    elif t == u'Vector6d':
+      return eigen.Vector6dFromC(c_mc_rtc.datastore_call_get[c_eigen.Vector6d](deref(self.impl), key, const_ref))
+    elif t == u'VectorXd':
+      return eigen.VectorXdFromC(c_mc_rtc.datastore_call_get[c_eigen.VectorXd](deref(self.impl), key, const_ref))
+    elif t == u'Matrix3d':
+      return eigen.Matrix3dFromC(c_mc_rtc.datastore_call_get[c_eigen.Matrix3d](deref(self.impl), key, const_ref))
+    elif t == u'Matrix6d':
+      return eigen.Matrix6dFromC(c_mc_rtc.datastore_call_get[c_eigen.Matrix6d](deref(self.impl), key, const_ref))
+    elif t == u'MatrixXd':
+      return eigen.MatrixXdFromC(c_mc_rtc.datastore_call_get[c_eigen.MatrixXd](deref(self.impl), key, const_ref))
+    elif t == u'Quaterniond':
+      return eigen.QuaterniondFromC(c_mc_rtc.datastore_call_get[c_eigen.Quaterniond](deref(self.impl), key, const_ref))
+    elif t == u'PTransformd':
+      return sva.PTransformdFromC(c_mc_rtc.datastore_call_get[c_sva.PTransformd](deref(self.impl), key, const_ref))
+    elif t == u'MotionVecd':
+      return sva.MotionVecdFromC(c_mc_rtc.datastore_call_get[c_sva.MotionVecd](deref(self.impl), key, const_ref))
+    elif t == u'ForceVecd':
+      return sva.ForceVecdFromC(c_mc_rtc.datastore_call_get[c_sva.ForceVecd](deref(self.impl), key, const_ref))
+    raise TypeError("Cannot return a datastore callback value of type {}".format(t))
+  cdef void _call_set(self, string key, t, value, cppbool const_ref) except *:
+    cdef vector[double] vd
+    cdef vector[string] vs
+    if t in DATASTORE_NUMERIC_TYPES:
+      datastore_checked(t, value, numbers.Number)
+    if t == u'bool':
+      c_mc_rtc.datastore_call_set[cppbool](deref(self.impl), key, <cppbool>(value), const_ref)
+    elif t == u'int':
+      c_mc_rtc.datastore_call_set[int](deref(self.impl), key, <int>(value), const_ref)
+    elif t == u'unsigned int':
+      c_mc_rtc.datastore_call_set[c_mc_rtc.cppuint](deref(self.impl), key, <c_mc_rtc.cppuint>(value), const_ref)
+    elif t == u'size_t':
+      c_mc_rtc.datastore_call_set[size_t](deref(self.impl), key, <size_t>(value), const_ref)
+    elif t == u'double':
+      c_mc_rtc.datastore_call_set[double](deref(self.impl), key, <double>(value), const_ref)
+    elif t == u'string':
+      c_mc_rtc.datastore_call_set[string](deref(self.impl), key, datastore_key(datastore_checked(t, value, (str, unicode, bytes))), const_ref)
+    elif t == u'vector<double>':
+      vd = datastore_as_vecd(t, value)
+      c_mc_rtc.datastore_call_set[vector[double]](deref(self.impl), key, vd, const_ref)
+    elif t == u'vector<string>':
+      vs = datastore_as_vecs(t, value)
+      c_mc_rtc.datastore_call_set[vector[string]](deref(self.impl), key, vs, const_ref)
+    elif t == u'Vector2d':
+      c_mc_rtc.datastore_call_set[c_eigen.Vector2d](deref(self.impl), key, (<eigen.Vector2d>(datastore_checked(t, value, eigen.Vector2d))).impl, const_ref)
+    elif t == u'Vector3d':
+      c_mc_rtc.datastore_call_set[c_eigen.Vector3d](deref(self.impl), key, (<eigen.Vector3d>(datastore_checked(t, value, eigen.Vector3d))).impl, const_ref)
+    elif t == u'Vector6d':
+      c_mc_rtc.datastore_call_set[c_eigen.Vector6d](deref(self.impl), key, (<eigen.Vector6d>(datastore_checked(t, value, eigen.Vector6d))).impl, const_ref)
+    elif t == u'VectorXd':
+      c_mc_rtc.datastore_call_set[c_eigen.VectorXd](deref(self.impl), key, (<eigen.VectorXd>(datastore_checked(t, value, eigen.VectorXd))).impl, const_ref)
+    elif t == u'Matrix3d':
+      c_mc_rtc.datastore_call_set[c_eigen.Matrix3d](deref(self.impl), key, (<eigen.Matrix3d>(datastore_checked(t, value, eigen.Matrix3d))).impl, const_ref)
+    elif t == u'Matrix6d':
+      c_mc_rtc.datastore_call_set[c_eigen.Matrix6d](deref(self.impl), key, (<eigen.Matrix6d>(datastore_checked(t, value, eigen.Matrix6d))).impl, const_ref)
+    elif t == u'MatrixXd':
+      c_mc_rtc.datastore_call_set[c_eigen.MatrixXd](deref(self.impl), key, (<eigen.MatrixXd>(datastore_checked(t, value, eigen.MatrixXd))).impl, const_ref)
+    elif t == u'Quaterniond':
+      c_mc_rtc.datastore_call_set[c_eigen.Quaterniond](deref(self.impl), key, (<eigen.Quaterniond>(datastore_checked(t, value, eigen.Quaterniond))).impl, const_ref)
+    elif t == u'PTransformd':
+      c_mc_rtc.datastore_call_set[c_sva.PTransformd](deref(self.impl), key, deref((<sva.PTransformd>(datastore_checked(t, value, sva.PTransformd))).impl), const_ref)
+    elif t == u'MotionVecd':
+      c_mc_rtc.datastore_call_set[c_sva.MotionVecd](deref(self.impl), key, deref((<sva.MotionVecd>(datastore_checked(t, value, sva.MotionVecd))).impl), const_ref)
+    elif t == u'ForceVecd':
+      c_mc_rtc.datastore_call_set[c_sva.ForceVecd](deref(self.impl), key, deref((<sva.ForceVecd>(datastore_checked(t, value, sva.ForceVecd))).impl), const_ref)
+    else:
+      raise TypeError("Cannot call a datastore setter of type {}".format(t))
   cdef void _set(self, string key, t, value, cppbool create) except *:
     cdef vector[double] vd
     cdef vector[string] vs

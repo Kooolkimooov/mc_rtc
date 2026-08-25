@@ -97,6 +97,10 @@ cdef extern from "mc_rtc_wrapper.hpp":
   function[string] make_string_log_callback[T,U](T,U)
 
   void datastore_set[T](DataStore&, const string&, const T&, cppbool) except +
+  string datastore_callback_signature(DataStore&, const string&) except +
+  void datastore_call_void(DataStore&, const string&) except +
+  T datastore_call_get[T](DataStore&, const string&, cppbool) except +
+  void datastore_call_set[T](DataStore&, const string&, const T&, cppbool) except +
 
   T get_config_as[T](Configuration&) except +
   T get_config_as[T](Configuration&, const T&) except +
