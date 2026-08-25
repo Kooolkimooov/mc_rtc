@@ -147,6 +147,7 @@ cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
 
 cdef extern from "mc_control_wrapper.hpp" namespace "mc_control":
   ControllerResetData & const_cast_crd(const ControllerResetData&)
+  ControllerResetData * make_crd(const vector[vector[double]]&) except+
 
   ctypedef cppbool (*run_callback_t)(void*) except+
   ctypedef void (*reset_callback_t)(const ControllerResetData&, void*) except+

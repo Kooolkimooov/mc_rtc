@@ -8,6 +8,9 @@ from libcpp cimport bool as cppbool
 
 cdef class ControllerResetData(object):
   cdef c_mc_control.ControllerResetData * impl
+  # True when impl was allocated here and must be freed; False when it only
+  # points at one C++ owns (ControllerResetDataFromPtr, the reset callback).
+  cdef cppbool owns_impl
 
 cdef ControllerResetData ControllerResetDataFromPtr(c_mc_control.ControllerResetData *)
 

@@ -39,15 +39,41 @@ def deprecated():
   warnings.simplefilter('ignore', category=DeprecationWarning)
 
 cdef class ControllerResetData(object):
-  def __cinit__(self):
-    pass
+  def __cinit__(self, q = None):
+    # Called with no argument this stays a shell for ControllerResetDataFromPtr
+    # to fill, which is all it ever was: impl was never assigned here, so a
+    # Python-constructed instance carried a null pointer and any use of it --
+    # reading q, or handing it to MCController::reset -- dereferenced null.
+    cdef vector[vector[double]] qv
+    cdef vector[double] qj
+    self.impl = NULL
+    self.owns_impl = False
+    if q is None:
+      return
+    for joint in q:
+      qj.clear()
+      for value in joint:
+        qj.push_back(<double>(value))
+      qv.push_back(qj)
+    self.impl = c_mc_control.make_crd(qv)
+    self.owns_impl = True
+
+  def __dealloc__(self):
+    if self.owns_impl and self.impl != NULL:
+      del self.impl
+      self.impl = NULL
+
   property q:
     def __get__(self):
+      if self.impl == NULL:
+        raise ValueError("this ControllerResetData holds no data; construct it with "
+                         "a configuration, e.g. ControllerResetData(robot.mbc.q)")
       return self.impl.q
 
 cdef ControllerResetData ControllerResetDataFromPtr(c_mc_control.ControllerResetData * p):
     cdef ControllerResetData ret = ControllerResetData()
     ret.impl = p
+    ret.owns_impl = False
     return ret
 
 cdef class Contact(object):
@@ -127,6 +153,9 @@ cdef class MCController(object):
   def run(self):
     return self.base.run()
   def reset(self, ControllerResetData data):
+    if data.impl == NULL:
+      raise ValueError("ControllerResetData holds no data; construct it with a "
+                       "configuration, e.g. ControllerResetData(robot.mbc.q)")
     self.base.reset(deref(data.impl))
   def env(self):
     return mc_rbdyn.RobotFromC(self.base.env())
