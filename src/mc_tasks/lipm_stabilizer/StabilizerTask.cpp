@@ -633,9 +633,9 @@ void StabilizerTask::setExternalWrenches(const std::vector<std::string> & surfac
     extWrenches_.push_back({targetWrenches[i], sva::ForceVecd::Zero(), gains[i], surfaceNames[i]});
     if(!robot().surfaceHasIndirectForceSensor(surfaceNames[i]))
     {
-      mc_rtc::log::warning(
-          "[StabilizerTask] surface {} does not have force sensor. The target force is used as the measured force.",
-          surfaceNames[i]);
+      // mc_rtc::log::warning(
+      //     "[StabilizerTask] surface {} does not have force sensor. The target force is used as the measured force.",
+      //     surfaceNames[i]);
     }
   }
 
