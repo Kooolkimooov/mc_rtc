@@ -20,7 +20,10 @@ cdef Collision CollisionFromC(const c_mc_rbdyn.Collision&)
 
 cdef class BodySensor(object):
   cdef cppbool own_impl__
-  cdef const c_mc_rbdyn.BodySensor * impl
+  # Non-const so the setters can be called. BodySensorFromCRef already casts the
+  # const away (const_cast_body_sensor) -- the pointer was const only here, which
+  # is what kept the Python class read-only.
+  cdef c_mc_rbdyn.BodySensor * impl
 
 cdef BodySensor BodySensorFromCRef(const c_mc_rbdyn.BodySensor&)
 

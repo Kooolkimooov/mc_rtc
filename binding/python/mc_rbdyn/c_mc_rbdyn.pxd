@@ -51,6 +51,14 @@ cdef extern from "<mc_rbdyn/BodySensor.h>" namespace "mc_rbdyn":
     const Vector3d & linearVelocity()
     const Vector3d & angularVelocity()
     const Vector3d & linearAcceleration()
+    # These setters are public in BodySensor.h but were never declared here, so
+    # the Python class was read-only: sensor values could only be pushed through
+    # MCGlobalController, whose overloads all target the control robot.
+    void position(const Vector3d &)
+    void orientation(const Quaterniond &)
+    void linearVelocity(const Vector3d &)
+    void angularVelocity(const Vector3d &)
+    void linearAcceleration(const Vector3d &)
 
 cdef extern from "<mc_rbdyn/Flexibility.h>" namespace "mc_rbdyn":
   cdef cppclass Flexibility:

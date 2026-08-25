@@ -163,19 +163,33 @@ cdef class BodySensor(object):
     return self.impl.parentBody()
   def X_b_s(self):
     return sva.PTransformdFromC(self.impl.X_b_s())
-  def position(self):
-    return eigen.Vector3dFromC(self.impl.position())
-  def orientation(self):
-    return eigen.QuaterniondFromC(self.impl.orientation())
-  def linearVelocity(self):
-    return eigen.Vector3dFromC(self.impl.linearVelocity())
-  def angularVelocity(self):
-    return eigen.Vector3dFromC(self.impl.angularVelocity())
+  # Getter with no argument, setter with one -- the same shape Robot.posW uses,
+  # so a sensor can be written on whichever robot it was reached through
+  # (control or real) instead of only through MCGlobalController, which always
+  # targets the control robot.
+  def position(self, eigen.Vector3d v = None):
+    if v is None:
+      return eigen.Vector3dFromC(self.impl.position())
+    self.impl.position(v.impl)
+  def orientation(self, eigen.Quaterniond q = None):
+    if q is None:
+      return eigen.QuaterniondFromC(self.impl.orientation())
+    self.impl.orientation(q.impl)
+  def linearVelocity(self, eigen.Vector3d v = None):
+    if v is None:
+      return eigen.Vector3dFromC(self.impl.linearVelocity())
+    self.impl.linearVelocity(v.impl)
+  def angularVelocity(self, eigen.Vector3d v = None):
+    if v is None:
+      return eigen.Vector3dFromC(self.impl.angularVelocity())
+    self.impl.angularVelocity(v.impl)
   def acceleration(self):
     deprecated()
     return eigen.Vector3dFromC(self.impl.linearAcceleration())
-  def linearAcceleration(self):
-    return eigen.Vector3dFromC(self.impl.linearAcceleration())
+  def linearAcceleration(self, eigen.Vector3d v = None):
+    if v is None:
+      return eigen.Vector3dFromC(self.impl.linearAcceleration())
+    self.impl.linearAcceleration(v.impl)
 
 cdef BodySensor BodySensorFromCRef(const c_mc_rbdyn.BodySensor & bs):
     cdef BodySensor ret = BodySensor(skip_alloc = True)
