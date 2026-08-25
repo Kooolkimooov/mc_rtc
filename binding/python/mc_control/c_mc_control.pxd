@@ -124,6 +124,10 @@ cdef extern from *:
 
 
 cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
+  # The real type is std::map<std::string, Eigen::Quaterniond, std::less<...>,
+  # Eigen::aligned_allocator<...>>; alias it so Cython emits the C++ typedef name.
+  ctypedef cppmap[string, Quaterniond] QuaternionMap "mc_control::MCGlobalController::QuaternionMap"
+
   cdef cppclass MCGlobalController:
     MCGlobalController()
     MCGlobalController(string)
@@ -137,6 +141,11 @@ cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
     void setSensorLinearVelocity(Vector3d)
     void setSensorAngularVelocity(Vector3d)
     void setSensorLinearAcceleration(Vector3d)
+    void setSensorPositions(cppmap[string, Vector3d]) except +
+    void setSensorOrientations(QuaternionMap) except +
+    void setSensorLinearVelocities(cppmap[string, Vector3d]) except +
+    void setSensorAngularVelocities(cppmap[string, Vector3d]) except +
+    void setSensorLinearAccelerations(cppmap[string, Vector3d]) except +
     void setEncoderValues(vector[double])
     void setEncoderVelocities(vector[double])
     void setJointTorques(vector[double])

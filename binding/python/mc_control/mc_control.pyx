@@ -7,6 +7,7 @@
 cimport mc_control.c_mc_control as c_mc_control
 
 cimport eigen.eigen as eigen
+cimport eigen.c_eigen as c_eigen
 
 cimport sva.c_sva as c_sva
 cimport sva.sva as sva
@@ -380,6 +381,41 @@ cdef class MCGlobalController(object):
     self.impl.setSensorLinearAcceleration(a.impl)
   def setSensorLinearAcceleration(self, eigen.Vector3d a):
     self.impl.setSensorLinearAcceleration(a.impl)
+  def setSensorPositions(self, poses):
+    cdef cppmap[string, c_eigen.Vector3d] m = cppmap[string, c_eigen.Vector3d]()
+    for name, p in poses.items():
+      if isinstance(name, unicode):
+        name = name.encode(u'ascii')
+      m[<string>(name)] = (<eigen.Vector3d?>p).impl
+    self.impl.setSensorPositions(m)
+  def setSensorOrientations(self, oris):
+    cdef c_mc_control.QuaternionMap m = c_mc_control.QuaternionMap()
+    for name, q in oris.items():
+      if isinstance(name, unicode):
+        name = name.encode(u'ascii')
+      m[<string>(name)] = (<eigen.Quaterniond?>q).impl
+    self.impl.setSensorOrientations(m)
+  def setSensorLinearVelocities(self, vels):
+    cdef cppmap[string, c_eigen.Vector3d] m = cppmap[string, c_eigen.Vector3d]()
+    for name, v in vels.items():
+      if isinstance(name, unicode):
+        name = name.encode(u'ascii')
+      m[<string>(name)] = (<eigen.Vector3d?>v).impl
+    self.impl.setSensorLinearVelocities(m)
+  def setSensorAngularVelocities(self, vels):
+    cdef cppmap[string, c_eigen.Vector3d] m = cppmap[string, c_eigen.Vector3d]()
+    for name, v in vels.items():
+      if isinstance(name, unicode):
+        name = name.encode(u'ascii')
+      m[<string>(name)] = (<eigen.Vector3d?>v).impl
+    self.impl.setSensorAngularVelocities(m)
+  def setSensorLinearAccelerations(self, accels):
+    cdef cppmap[string, c_eigen.Vector3d] m = cppmap[string, c_eigen.Vector3d]()
+    for name, a in accels.items():
+      if isinstance(name, unicode):
+        name = name.encode(u'ascii')
+      m[<string>(name)] = (<eigen.Vector3d?>a).impl
+    self.impl.setSensorLinearAccelerations(m)
   def setEncoderValues(self, q):
     self.impl.setEncoderValues(q)
   def setEncoderVelocities(self, alpha):
