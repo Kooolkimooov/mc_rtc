@@ -35,6 +35,29 @@ cdef extern from "<mc_rtc/log/Logger.h>" namespace "mc_rtc":
     void addLogEntry[T](const string&, T get_fn)
     void removeLogEntry(const string&)
 
+cdef extern from *:
+  # Cython has no syntax for "unsigned int" inside template brackets
+  ctypedef unsigned int cppuint "unsigned int"
+
+cdef extern from "<mc_rtc/type_name.h>" namespace "mc_rtc":
+  string type_name[T]()
+
+cdef extern from "<mc_rtc/DataStore.h>" namespace "mc_rtc":
+  cdef cppclass DataStore:
+    DataStore()
+
+    cppbool has(const string&)
+    vector[string] keys()
+    string type(const string&) except +
+
+    T get[T](const string&) except +
+
+    void remove(const string&)
+    void clear()
+
+    string name()
+    void name(const string&)
+
 cdef extern from "<mc_rtc/Configuration.h>" namespace "mc_rtc":
   cdef cppclass Configuration:
     Configuration()
@@ -72,6 +95,8 @@ cdef extern from "mc_rtc_wrapper.hpp":
   function[c_sva.PTransformd] make_pt_log_callback[T,U](T,U)
   function[c_sva.ForceVecd] make_fv_log_callback[T,U](T,U)
   function[string] make_string_log_callback[T,U](T,U)
+
+  void datastore_set[T](DataStore&, const string&, const T&, cppbool) except +
 
   T get_config_as[T](Configuration&) except +
   T get_config_as[T](Configuration&, const T&) except +

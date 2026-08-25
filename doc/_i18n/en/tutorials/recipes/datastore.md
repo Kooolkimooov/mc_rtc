@@ -108,3 +108,26 @@ A default `DataStore` instance is available in the `mc_control::MCController` cl
   // Call directly through the datastore (the function return type and arguments type must be repeated)
   datastore().call<void, double>("lambda", 42);
   ```
+
+## Python bindings
+
+The datastore is available in the Python bindings as `mc_rtc.DataStore`, and the controller's own instance through `datastore()`:
+
+```python
+ds = self.qpsolver.controller().datastore()  # or ctl.datastore() in an FSM state
+ds.make("Ready", True)
+ds.make("Target", eigen.Vector3d(1, 2, 3))
+if "Plan::Update" in ds:
+    ds["Plan::Update"] = 42
+print(ds.get("Plan::Steps", []))
+```
+
+Unlike the `c++` interface, the bindings convert values to and from Python so `get` returns a **copy** of the stored object; write it back with `assign` (or `[]`) to modify the datastore. The type of an object is that of the value it was created from, and it never changes afterwards: `assign` converts the value to the stored type, so an object created as a `size_t` in `c++` can be written from a Python `int`.
+
+Only the following types can be read or written from Python: `bool`, `int`, `unsigned int`, `size_t`, `double`, `string`, `vector<double>`, `vector<string>`, `Vector2d`, `Vector3d`, `Vector6d`, `VectorXd`, `Matrix3d`, `Matrix6d`, `MatrixXd`, `Quaterniond`, `PTransformd`, `MotionVecd` and `ForceVecd`. Since Python does not distinguish the `c++` integer types, an `int` creates an `int` and a `float` creates a `double` unless the type is given explicitely:
+
+```python
+ds.make("Counter", 0, "size_t")
+```
+
+Objects of any other type, callbacks created with `make_call` in particular, can still be listed with `keys()` and looked up with `has()` and `type()`, but reading or writing them raises a `TypeError`. `tag()` returns the type of an object as one of the names above, or `None` when the bindings cannot convert it.

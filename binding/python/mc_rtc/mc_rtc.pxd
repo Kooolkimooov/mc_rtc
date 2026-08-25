@@ -5,6 +5,7 @@
 cimport mc_rtc.c_mc_rtc as c_mc_rtc
 
 from libcpp cimport bool as cppbool
+from libcpp.string cimport string
 
 cdef class Logger(object):
   cdef c_mc_rtc.Logger * impl
@@ -17,3 +18,15 @@ cdef class Configuration(object):
 
 cdef Configuration ConfigurationFromValue(c_mc_rtc.Configuration)
 cdef Configuration ConfigurationFromRef(c_mc_rtc.Configuration &)
+
+cdef class DataStore(object):
+  cdef c_mc_rtc.DataStore * impl
+  # True when impl was allocated here, False when it points at a datastore owned
+  # by C++ (e.g. a controller's)
+  cdef cppbool own_impl__
+
+  cdef object _tag(self, string key)
+  cdef object _get(self, string key, t)
+  cdef void _set(self, string key, t, value, cppbool create) except *
+
+cdef DataStore DataStoreFromRef(c_mc_rtc.DataStore &)

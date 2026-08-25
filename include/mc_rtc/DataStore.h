@@ -150,6 +150,20 @@ struct DataStore
   }
 
   /**
+   * @brief Returns the type name of a stored object
+   *
+   * The name is the one given by \ref mc_rtc::type_name so it is only meaningful
+   * when compared to type_name<T>() obtained in the same program. It is mainly
+   * useful to dispatch on the stored type when it is not known statically, e.g.
+   * in the Python bindings.
+   *
+   * @param name Name of the stored object
+   *
+   * @throws std::runtime_error if no object with that name is in the datastore
+   */
+  inline std::string type(const std::string & name) const { return get_data(name).type(); }
+
+  /**
    * @brief Get a reference to an object on the datastore
    * @param name Name of the stored oject
    * @return Reference to the stored object

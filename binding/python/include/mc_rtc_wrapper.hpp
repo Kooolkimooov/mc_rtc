@@ -6,6 +6,7 @@
 
 #include <mc_rbdyn/configuration_io.h>
 #include <mc_rtc/Configuration.h>
+#include <mc_rtc/DataStore.h>
 #include <mc_rtc/loader.h>
 
 #include <SpaceVecAlg/SpaceVecAlg>
@@ -67,3 +68,19 @@ inline mc_rtc::Configuration ConfigurationFromData(const std::string & data)
 
 inline void set_loader_debug_suffix(const std::string & suffix)
 { mc_rtc::Loader::debug_suffix = suffix; }
+
+/** Create or overwrite a datastore object
+ *
+ * Cython has no way to select between two calls in a single expression, so the
+ * make/assign choice is made here to avoid duplicating the (long) type dispatch
+ * on the Python side.
+ *
+ * @param create When true the object must not exist yet, otherwise it must
+ * already exist and hold a T
+ */
+template<typename T>
+void datastore_set(mc_rtc::DataStore & store, const std::string & name, const T & value, bool create)
+{
+  if(create) { store.make<T>(name, value); }
+  else { store.assign<T>(name, value); }
+}

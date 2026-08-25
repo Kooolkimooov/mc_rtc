@@ -79,6 +79,7 @@ cdef extern from "<mc_control/mc_controller.h>" namespace "mc_control":
     void supported_robots(vector[string] &)
     c_mc_rtc.Logger & logger()
     shared_ptr[c_mc_rtc_gui.StateBuilder] gui()
+    c_mc_rtc.DataStore & datastore()
 
     double timeStep
     unique_ptr[ContactConstraint] contactConstraint

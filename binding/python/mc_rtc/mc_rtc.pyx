@@ -315,6 +315,328 @@ cdef Configuration ConfigurationFromRef(c_mc_rtc.Configuration & conf):
   ret.impl = &conf
   return ret
 
+# The datastore holds arbitrary C++ objects and can only report their type name,
+# so the bindings keep a table of the types they know how to convert and
+# dispatch on it. Only these types can be read from or written to the datastore
+# from Python; anything else raises a TypeError.
+cdef dict __DATASTORE_TAGS = {}
+
+cdef dict datastore_tags():
+  global __DATASTORE_TAGS
+  if not __DATASTORE_TAGS:
+    __DATASTORE_TAGS = {
+      c_mc_rtc.type_name[cppbool]().decode(u'ascii'): u'bool',
+      c_mc_rtc.type_name[int]().decode(u'ascii'): u'int',
+      c_mc_rtc.type_name[c_mc_rtc.cppuint]().decode(u'ascii'): u'unsigned int',
+      c_mc_rtc.type_name[size_t]().decode(u'ascii'): u'size_t',
+      c_mc_rtc.type_name[double]().decode(u'ascii'): u'double',
+      c_mc_rtc.type_name[string]().decode(u'ascii'): u'string',
+      c_mc_rtc.type_name[vector[double]]().decode(u'ascii'): u'vector<double>',
+      c_mc_rtc.type_name[vector[string]]().decode(u'ascii'): u'vector<string>',
+      c_mc_rtc.type_name[c_eigen.Vector2d]().decode(u'ascii'): u'Vector2d',
+      c_mc_rtc.type_name[c_eigen.Vector3d]().decode(u'ascii'): u'Vector3d',
+      c_mc_rtc.type_name[c_eigen.Vector6d]().decode(u'ascii'): u'Vector6d',
+      c_mc_rtc.type_name[c_eigen.VectorXd]().decode(u'ascii'): u'VectorXd',
+      c_mc_rtc.type_name[c_eigen.Matrix3d]().decode(u'ascii'): u'Matrix3d',
+      c_mc_rtc.type_name[c_eigen.Matrix6d]().decode(u'ascii'): u'Matrix6d',
+      c_mc_rtc.type_name[c_eigen.MatrixXd]().decode(u'ascii'): u'MatrixXd',
+      c_mc_rtc.type_name[c_eigen.Quaterniond]().decode(u'ascii'): u'Quaterniond',
+      c_mc_rtc.type_name[c_sva.PTransformd]().decode(u'ascii'): u'PTransformd',
+      c_mc_rtc.type_name[c_sva.MotionVecd]().decode(u'ascii'): u'MotionVecd',
+      c_mc_rtc.type_name[c_sva.ForceVecd]().decode(u'ascii'): u'ForceVecd',
+    }
+  return __DATASTORE_TAGS
+
+# Types the datastore bindings can convert, as returned by DataStore.tag() and
+# accepted by DataStore.make()
+DATASTORE_TYPES = [u'bool', u'int', u'unsigned int', u'size_t', u'double',
+                   u'string', u'vector<double>', u'vector<string>',
+                   u'Vector2d', u'Vector3d', u'Vector6d', u'VectorXd',
+                   u'Matrix3d', u'Matrix6d', u'MatrixXd', u'Quaterniond',
+                   u'PTransformd', u'MotionVecd', u'ForceVecd']
+
+# Those all hold a Python number so they are interchangeable on write
+DATASTORE_NUMERIC_TYPES = [u'bool', u'int', u'unsigned int', u'size_t', u'double']
+
+cdef string datastore_key(name) except *:
+  if isinstance(name, unicode):
+    name = name.encode(u'ascii')
+  return <string>(name)
+
+# Type used to create a datastore object out of a Python value. Python does not
+# distinguish the C++ integer types so an int always creates an int and a float
+# always creates a double, use the type argument of make to pick another one
+cdef object datastore_value_type(value):
+  if isinstance(value, bool):
+    return u'bool'
+  if isinstance(value, eigen.Vector2d):
+    return u'Vector2d'
+  if isinstance(value, eigen.Vector3d):
+    return u'Vector3d'
+  if isinstance(value, eigen.Vector6d):
+    return u'Vector6d'
+  if isinstance(value, eigen.VectorXd):
+    return u'VectorXd'
+  if isinstance(value, eigen.Matrix3d):
+    return u'Matrix3d'
+  if isinstance(value, eigen.Matrix6d):
+    return u'Matrix6d'
+  if isinstance(value, eigen.MatrixXd):
+    return u'MatrixXd'
+  if isinstance(value, eigen.Quaterniond):
+    return u'Quaterniond'
+  if isinstance(value, sva.PTransformd):
+    return u'PTransformd'
+  if isinstance(value, sva.MotionVecd):
+    return u'MotionVecd'
+  if isinstance(value, sva.ForceVecd):
+    return u'ForceVecd'
+  if isinstance(value, numbers.Integral):
+    return u'int'
+  if isinstance(value, numbers.Number):
+    return u'double'
+  if isinstance(value, (str, unicode, bytes)):
+    return u'string'
+  if isinstance(value, Iterable):
+    items = list(value)
+    if all([isinstance(v, numbers.Number) and not isinstance(v, bool) for v in items]):
+      return u'vector<double>'
+    if all([isinstance(v, (str, unicode, bytes)) for v in items]):
+      return u'vector<string>'
+    raise TypeError("Only sequences of numbers or of strings can be stored in the datastore")
+  raise TypeError("{} cannot be stored in the datastore".format(type(value).__name__))
+
+cdef object datastore_checked(t, value, expected):
+  if not isinstance(value, expected):
+    raise TypeError("Datastore object of type {} cannot be set from a {}".format(t, type(value).__name__))
+  return value
+
+cdef vector[double] datastore_as_vecd(t, value) except *:
+  cdef vector[double] out
+  datastore_checked(t, value, Iterable)
+  for v in value:
+    out.push_back(<double>(datastore_checked(t, v, numbers.Number)))
+  return out
+
+cdef vector[string] datastore_as_vecs(t, value) except *:
+  cdef vector[string] out
+  datastore_checked(t, value, Iterable)
+  for v in value:
+    out.push_back(datastore_key(datastore_checked(t, v, (str, unicode, bytes))))
+  return out
+
+cdef class DataStore(object):
+  """Access to an mc_rtc::DataStore
+
+  Values are converted to and from Python so what is read is a copy: mutating
+  the object returned by get() does not change the datastore, write it back with
+  assign() (or the [] operator) instead.
+  """
+  def __dealloc__(self):
+    if self.own_impl__:
+      del self.impl
+  def __cinit__(self, name = None, skip_alloc = False):
+    if skip_alloc:
+      self.own_impl__ = False
+      self.impl = NULL
+    else:
+      self.own_impl__ = True
+      self.impl = new c_mc_rtc.DataStore()
+      if name is not None:
+        self.impl.name(datastore_key(name))
+  def name(self, name = None):
+    if name is None:
+      return self.impl.name().decode(u'ascii')
+    self.impl.name(datastore_key(name))
+  def has(self, name):
+    return self.impl.has(datastore_key(name))
+  def keys(self):
+    # Through a local, iterating self.impl.keys() directly makes Cython take it
+    # for a Python dict and iterate the DataStore pointer as a PyObject
+    cdef vector[string] keys = self.impl.keys()
+    return [k.decode(u'ascii') for k in keys]
+  def type(self, name):
+    """C++ type name of a stored object, as given by mc_rtc::type_name"""
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      raise KeyError(name)
+    return self.impl.type(key).decode(u'ascii')
+  def tag(self, name):
+    """Type of a stored object as one of DATASTORE_TYPES
+
+    Returns None when the object's type is not one the bindings can convert
+    """
+    return datastore_tags().get(self.type(name), None)
+  def get(self, name, default = None):
+    """Value of a stored object
+
+    Raises KeyError when there is no such object and no default was given, and
+    TypeError when the stored type is not supported by the bindings
+    """
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      if default is None:
+        raise KeyError(name)
+      return default
+    return self._get(key, self._tag(key))
+  def make(self, name, value, t = None):
+    """Create an object on the datastore
+
+    @param t Type to create the object as, one of DATASTORE_TYPES, defaults to
+    the type deduced from value
+
+    Raises RuntimeError when an object of that name already exists
+    """
+    if t is None:
+      t = datastore_value_type(value)
+    elif t not in DATASTORE_TYPES:
+      raise TypeError("{} is not a datastore type supported by the bindings".format(t))
+    self._set(datastore_key(name), t, value, True)
+  def assign(self, name, value):
+    """Overwrite an existing object on the datastore
+
+    The value is converted to the type the object was created with, so an
+    existing size_t can be written from a Python int
+
+    Raises KeyError when there is no such object
+    """
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      raise KeyError(name)
+    self._set(key, self._tag(key), value, False)
+  def remove(self, name):
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      raise KeyError(name)
+    self.impl.remove(key)
+  def clear(self):
+    self.impl.clear()
+  # Special methods
+  def __getitem__(self, name):
+    cdef string key = datastore_key(name)
+    if not self.impl.has(key):
+      raise KeyError(name)
+    return self._get(key, self._tag(key))
+  def __setitem__(self, name, value):
+    """Create the object when it does not exist yet, overwrite it otherwise"""
+    cdef string key = datastore_key(name)
+    if self.impl.has(key):
+      self._set(key, self._tag(key), value, False)
+    else:
+      self._set(key, datastore_value_type(value), value, True)
+  def __delitem__(self, name):
+    self.remove(name)
+  def __contains__(self, name):
+    return self.impl.has(datastore_key(name))
+  def __len__(self):
+    cdef vector[string] keys = self.impl.keys()
+    return keys.size()
+  def __iter__(self):
+    return iter(self.keys())
+  def __repr__(self):
+    return "{}({})".format(self.name(), ", ".join(sorted(self.keys())))
+  # Type dispatch, the datastore only knows the type of its objects at runtime
+  cdef object _tag(self, string key):
+    t = self.impl.type(key).decode(u'ascii')
+    tag = datastore_tags().get(t, None)
+    if tag is None:
+      raise TypeError('Datastore object "{}" holds a {} which the Python bindings cannot handle'.format(key.decode(u'ascii'), t))
+    return tag
+  cdef object _get(self, string key, t):
+    cdef vector[string] vs
+    if t == u'bool':
+      return self.impl.get[cppbool](key)
+    elif t == u'int':
+      return self.impl.get[int](key)
+    elif t == u'unsigned int':
+      return self.impl.get[c_mc_rtc.cppuint](key)
+    elif t == u'size_t':
+      return self.impl.get[size_t](key)
+    elif t == u'double':
+      return self.impl.get[double](key)
+    elif t == u'string':
+      return self.impl.get[string](key).decode(u'ascii')
+    elif t == u'vector<double>':
+      return self.impl.get[vector[double]](key)
+    elif t == u'vector<string>':
+      vs = self.impl.get[vector[string]](key)
+      return [v.decode(u'ascii') for v in vs]
+    elif t == u'Vector2d':
+      return eigen.Vector2dFromC(self.impl.get[c_eigen.Vector2d](key))
+    elif t == u'Vector3d':
+      return eigen.Vector3dFromC(self.impl.get[c_eigen.Vector3d](key))
+    elif t == u'Vector6d':
+      return eigen.Vector6dFromC(self.impl.get[c_eigen.Vector6d](key))
+    elif t == u'VectorXd':
+      return eigen.VectorXdFromC(self.impl.get[c_eigen.VectorXd](key))
+    elif t == u'Matrix3d':
+      return eigen.Matrix3dFromC(self.impl.get[c_eigen.Matrix3d](key))
+    elif t == u'Matrix6d':
+      return eigen.Matrix6dFromC(self.impl.get[c_eigen.Matrix6d](key))
+    elif t == u'MatrixXd':
+      return eigen.MatrixXdFromC(self.impl.get[c_eigen.MatrixXd](key))
+    elif t == u'Quaterniond':
+      return eigen.QuaterniondFromC(self.impl.get[c_eigen.Quaterniond](key))
+    elif t == u'PTransformd':
+      return sva.PTransformdFromC(self.impl.get[c_sva.PTransformd](key))
+    elif t == u'MotionVecd':
+      return sva.MotionVecdFromC(self.impl.get[c_sva.MotionVecd](key))
+    elif t == u'ForceVecd':
+      return sva.ForceVecdFromC(self.impl.get[c_sva.ForceVecd](key))
+    raise TypeError("Cannot read a datastore object of type {}".format(t))
+  cdef void _set(self, string key, t, value, cppbool create) except *:
+    cdef vector[double] vd
+    cdef vector[string] vs
+    if t in DATASTORE_NUMERIC_TYPES:
+      datastore_checked(t, value, numbers.Number)
+    if t == u'bool':
+      c_mc_rtc.datastore_set[cppbool](deref(self.impl), key, <cppbool>(value), create)
+    elif t == u'int':
+      c_mc_rtc.datastore_set[int](deref(self.impl), key, <int>(value), create)
+    elif t == u'unsigned int':
+      c_mc_rtc.datastore_set[c_mc_rtc.cppuint](deref(self.impl), key, <c_mc_rtc.cppuint>(value), create)
+    elif t == u'size_t':
+      c_mc_rtc.datastore_set[size_t](deref(self.impl), key, <size_t>(value), create)
+    elif t == u'double':
+      c_mc_rtc.datastore_set[double](deref(self.impl), key, <double>(value), create)
+    elif t == u'string':
+      c_mc_rtc.datastore_set[string](deref(self.impl), key, datastore_key(datastore_checked(t, value, (str, unicode, bytes))), create)
+    elif t == u'vector<double>':
+      vd = datastore_as_vecd(t, value)
+      c_mc_rtc.datastore_set[vector[double]](deref(self.impl), key, vd, create)
+    elif t == u'vector<string>':
+      vs = datastore_as_vecs(t, value)
+      c_mc_rtc.datastore_set[vector[string]](deref(self.impl), key, vs, create)
+    elif t == u'Vector2d':
+      c_mc_rtc.datastore_set[c_eigen.Vector2d](deref(self.impl), key, (<eigen.Vector2d>(datastore_checked(t, value, eigen.Vector2d))).impl, create)
+    elif t == u'Vector3d':
+      c_mc_rtc.datastore_set[c_eigen.Vector3d](deref(self.impl), key, (<eigen.Vector3d>(datastore_checked(t, value, eigen.Vector3d))).impl, create)
+    elif t == u'Vector6d':
+      c_mc_rtc.datastore_set[c_eigen.Vector6d](deref(self.impl), key, (<eigen.Vector6d>(datastore_checked(t, value, eigen.Vector6d))).impl, create)
+    elif t == u'VectorXd':
+      c_mc_rtc.datastore_set[c_eigen.VectorXd](deref(self.impl), key, (<eigen.VectorXd>(datastore_checked(t, value, eigen.VectorXd))).impl, create)
+    elif t == u'Matrix3d':
+      c_mc_rtc.datastore_set[c_eigen.Matrix3d](deref(self.impl), key, (<eigen.Matrix3d>(datastore_checked(t, value, eigen.Matrix3d))).impl, create)
+    elif t == u'Matrix6d':
+      c_mc_rtc.datastore_set[c_eigen.Matrix6d](deref(self.impl), key, (<eigen.Matrix6d>(datastore_checked(t, value, eigen.Matrix6d))).impl, create)
+    elif t == u'MatrixXd':
+      c_mc_rtc.datastore_set[c_eigen.MatrixXd](deref(self.impl), key, (<eigen.MatrixXd>(datastore_checked(t, value, eigen.MatrixXd))).impl, create)
+    elif t == u'Quaterniond':
+      c_mc_rtc.datastore_set[c_eigen.Quaterniond](deref(self.impl), key, (<eigen.Quaterniond>(datastore_checked(t, value, eigen.Quaterniond))).impl, create)
+    elif t == u'PTransformd':
+      c_mc_rtc.datastore_set[c_sva.PTransformd](deref(self.impl), key, deref((<sva.PTransformd>(datastore_checked(t, value, sva.PTransformd))).impl), create)
+    elif t == u'MotionVecd':
+      c_mc_rtc.datastore_set[c_sva.MotionVecd](deref(self.impl), key, deref((<sva.MotionVecd>(datastore_checked(t, value, sva.MotionVecd))).impl), create)
+    elif t == u'ForceVecd':
+      c_mc_rtc.datastore_set[c_sva.ForceVecd](deref(self.impl), key, deref((<sva.ForceVecd>(datastore_checked(t, value, sva.ForceVecd))).impl), create)
+    else:
+      raise TypeError("Cannot write a datastore object of type {}".format(t))
+
+cdef DataStore DataStoreFromRef(c_mc_rtc.DataStore & store):
+  cdef DataStore ret = DataStore(skip_alloc = True)
+  ret.impl = &store
+  return ret
+
 class Loader(object):
   @staticmethod
   def debug_suffix(suffix):

@@ -186,6 +186,10 @@ cdef class MCController(object):
     return mc_rtc.LoggerFromRef(self.base.logger())
   def gui(self):
     return mc_rtc_gui.StateBuilderFromShPtr(self.base.gui())
+  def datastore(self):
+    # The datastore is shared with the observers, the plugins and the FSM
+    # states, it is how a Python controller exchanges data with them
+    return mc_rtc.DataStoreFromRef(self.base.datastore())
   property timeStep:
     def __get__(self):
       return self.base.timeStep
