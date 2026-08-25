@@ -450,7 +450,10 @@ cdef class MCGlobalController(object):
     self.impl.setWrenches(wrenches)
 
   def run(self):
-    return self.impl.run()
+    cdef cppbool res
+    with nogil:
+      res = self.impl.run()
+    return res
 
   def timestep(self):
     return self.impl.timestep()

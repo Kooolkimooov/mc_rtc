@@ -123,7 +123,7 @@ cdef extern from *:
   ctypedef array[double, seven] array7d
 
 
-cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
+cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control" nogil:
   # The real type is std::map<std::string, Eigen::Quaterniond, std::less<...>,
   # Eigen::aligned_allocator<...>>; alias it so Cython emits the C++ typedef name.
   ctypedef cppmap[string, Quaterniond] QuaternionMap "mc_control::MCGlobalController::QuaternionMap"
@@ -133,8 +133,8 @@ cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
     MCGlobalController(string)
     MCGlobalController(string, RobotModulePtr)
 
-    void init(vector[double])
-    void init(vector[double], array7d)
+    void init(vector[double]) except +
+    void init(vector[double], array7d) except +
     void reset(cppmap[string, vector[double]], cppmap[string, PTransformd]) except +
 
     void setSensorPosition(Vector3d)
@@ -152,7 +152,7 @@ cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
     void setJointTorques(vector[double])
     void setWrenches(cppmap[string, ForceVecd])
 
-    cppbool run()
+    cppbool run() except +
 
     double timestep()
     MCController& controller()
