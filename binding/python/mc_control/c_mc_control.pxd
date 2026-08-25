@@ -135,6 +135,7 @@ cdef extern from "<mc_control/mc_global_controller.h>" namespace "mc_control":
 
     void init(vector[double])
     void init(vector[double], array7d)
+    void reset(cppmap[string, vector[double]], cppmap[string, PTransformd]) except +
 
     void setSensorPosition(Vector3d)
     void setSensorOrientation(Quaterniond)

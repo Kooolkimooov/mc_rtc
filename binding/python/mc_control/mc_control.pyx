@@ -416,6 +416,25 @@ cdef class MCGlobalController(object):
         name = name.encode(u'ascii')
       m[<string>(name)] = (<eigen.Vector3d?>a).impl
     self.impl.setSensorLinearAccelerations(m)
+  def reset(self, reset_qs = None, reset_pos = None):
+    """Reset the controller (mirrors MCGlobalController::reset).
+
+    reset_qs: dict robot name -> encoder vector (refJointOrder)
+    reset_pos: dict robot name -> sva.PTransformd floating-base pose
+    """
+    cdef cppmap[string, vector[double]] qm = cppmap[string, vector[double]]()
+    cdef cppmap[string, c_sva.PTransformd] pm = cppmap[string, c_sva.PTransformd]()
+    if reset_qs is not None:
+      for name, q in reset_qs.items():
+        if isinstance(name, unicode):
+          name = name.encode(u'ascii')
+        qm[<string>(name)] = q
+    if reset_pos is not None:
+      for name, p in reset_pos.items():
+        if isinstance(name, unicode):
+          name = name.encode(u'ascii')
+        pm[<string>(name)] = deref((<sva.PTransformd?>p).impl)
+    self.impl.reset(qm, pm)
   def setEncoderValues(self, q):
     self.impl.setEncoderValues(q)
   def setEncoderVelocities(self, alpha):
