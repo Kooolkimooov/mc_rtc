@@ -589,6 +589,13 @@ cdef class Robot(object):
     if isinstance(name, unicode):
       name = name.encode(u'ascii')
     return ForceSensorFromCRef(self.impl.forceSensor(name))
+  def forceSensors(self):
+    self.__is_valid()
+    cdef unsigned int i
+    ret = []
+    for i in range(self.impl.forceSensors().size()):
+      ret.append(ForceSensorFromCRef(self.impl.forceSensors()[i]))
+    return ret
   def hasForceSensor(self, name):
     self.__is_valid()
     if isinstance(name, unicode):

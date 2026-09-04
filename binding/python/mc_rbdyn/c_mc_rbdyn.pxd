@@ -162,6 +162,7 @@ cdef extern from "<mc_rbdyn/Robot.h>" namespace "mc_rbdyn":
 
     bool hasForceSensor(string)
     const ForceSensor& forceSensor(string)
+    const vector[ForceSensor] & forceSensors()
     bool bodyHasForceSensor(string)
     const ForceSensor & bodyForceSensor(string)
 
