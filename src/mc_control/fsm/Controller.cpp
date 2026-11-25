@@ -99,9 +99,7 @@ Controller::~Controller()
 }
 
 bool Controller::run()
-{
-  return run(mc_solver::FeedbackType::None);
-}
+{ return run(mc_solver::FeedbackType::None); }
 
 bool Controller::run(mc_solver::FeedbackType fType)
 {
